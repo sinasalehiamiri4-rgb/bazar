@@ -176,15 +176,18 @@ $('chips').innerHTML=['g18','coin','usd','eur','ons'].map(k=>`<button class="chi
 document.querySelectorAll('.tile,.chip').forEach(b=>b.onclick=()=>select(b.dataset.k));
 
 // ---- دریافت داده‌ی واقعی ----
-const PROX=[u=>u,u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://corsproxy.io/?url='+encodeURIComponent(u)];
-async function jget(u){for(const p of PROX){try{const r=await fetch(p(u));if(r.ok)return await r.json()}catch(e){}}throw 0}
+let DG=[];
+const PROX=[['مستقیم',u=>u],['p1',u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u)],['p2',u=>'https://corsproxy.io/?url='+encodeURIComponent(u)]];
+async function jget(u,tag){for(const [n,p] of PROX){try{const r=await fetch(p(u),{signal:AbortSignal.timeout(7000)});if(!r.ok)throw 0;const j=await r.json();DG.push(tag+':'+n+'✓');return j}catch(e){DG.push(tag+':'+n+'✗')}}throw 0}
+const CUR=['https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json','https://latest.currency-api.pages.dev/v1/currencies/usd.json'];
+async function cur(){for(const u of CUR){try{const r=await fetch(u,{signal:AbortSignal.timeout(7000)});if(r.ok){const j=await r.json();if(j.usd){DG.push('پشتیبان✓');return j.usd}}}catch(e){}}DG.push('پشتیبان✗');return null}
 async function direct(){
-  const o={gold:null,eur:null,usdt:null,usdtSrc:null};
+  DG=[];const o={gold:null,eur:null,usdt:null,usdtSrc:null};let C=null;const gc=()=>C||(C=cur());
   await Promise.all([
-    jget('https://api.gold-api.com/price/XAU').then(j=>o.gold=j.price).catch(()=>0),
-    jget('https://open.er-api.com/v6/latest/USD').then(j=>o.eur=1/j.rates.EUR).catch(()=>0),
-    jget('https://api.nobitex.ir/v3/orderbook/USDTIRT').then(j=>{const p=parseFloat(j.lastTradePrice)/10;if(!(p>0))throw 0;o.usdt=p;o.usdtSrc='نوبیتکس'})
-     .catch(()=>jget('https://api.wallex.ir/v1/markets').then(j=>{o.usdt=parseFloat(j.result.symbols.USDTTMN.stats.lastPrice);o.usdtSrc='والکس'}).catch(()=>0))]);
+    jget('https://api.gold-api.com/price/XAU','طلا').then(j=>{o.gold=parseFloat(j.price)}).catch(async()=>{const c=await gc();if(c&&c.xau>0)o.gold=1/c.xau}),
+    jget('https://open.er-api.com/v6/latest/USD','یورو').then(j=>{o.eur=1/j.rates.EUR}).catch(async()=>{const c=await gc();if(c&&c.eur>0)o.eur=1/c.eur}),
+    jget('https://api.nobitex.ir/v3/orderbook/USDTIRT','تتر').then(j=>{const p=parseFloat(j.lastTradePrice)/10;if(!(p>0))throw 0;o.usdt=p;o.usdtSrc='نوبیتکس'})
+     .catch(()=>jget('https://api.wallex.ir/v1/markets','والکس').then(j=>{o.usdt=parseFloat(j.result.symbols.USDTTMN.stats.lastPrice);o.usdtSrc='والکس'}).catch(()=>0))]);
   return o;
 }
 async function load(){
@@ -212,7 +215,7 @@ try{
 let T={};const tm=()=>new Date().toLocaleTimeString('fa-IR');
 function save(){try{localStorage.setItem('np',JSON.stringify({H,base,rate,usdtSrc,T}))}catch(e){}}
 function restore(){try{const o=JSON.parse(localStorage.getItem('np'));if(!o)return;Object.keys(H).forEach(k=>H[k]=(o.H&&o.H[k])||[]);if(o.base)base=o.base;rate=o.rate||0;usdtSrc=o.usdtSrc||'';T=o.T||{}}catch(e){}}
-function stamp(d){if(d.gold>0)T.g=tm();if(d.eur>0)T.e=tm();if(d.usdt>0)T.u=tm();$('tm').textContent='آخرین دریافت — طلا: '+(T.g||'—')+' | یورو: '+(T.e||'—')+' | تتر: '+(T.u||'—')}
+function stamp(d){if(d.gold>0)T.g=tm();if(d.eur>0)T.e=tm();if(d.usdt>0)T.u=tm();$('tm').innerHTML='آخرین دریافت — طلا: '+(T.g||'—')+' | یورو: '+(T.e||'—')+' | تتر: '+(T.u||'—')+(DG.length?'<br>وضعیت منابع: '+DG.join(' '):'')}
 // ---- ماشین‌حساب ----
 function conv(){const k=$('cv-t').value,h=H[k],p=h[h.length-1],a=parseFloat($('cv-a').value.replace(/[^\d.]/g,''))||0;$('cv-r').textContent=p?fa(a*p,k==='ons'?2:0)+(k==='ons'?' دلار':' تومان'):'—'}
 $('cv-a').oninput=conv;$('cv-t').onchange=conv;
